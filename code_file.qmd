@@ -11,15 +11,15 @@ library(tidyverse)
 library(tidymodels)
 library(discrim)
 library(modelr)
+library(here)
 
 set.seed(271224)
 ```
 
 ```{r}
 # Get data of 6 and 7's
-six_seven_data <- read_csv("https://aloy.github.io/stat270/data/digits67.csv")
+six_seven_data <- read_csv(here("six_seven_data.csv"))
 ```
-
 
 ```{r}
 # All function definitions 
@@ -70,7 +70,6 @@ calc_prop <- function (region, row) {
 }
 ```
 
-
 ```{r}
 set.seed(271224)
 
@@ -118,11 +117,10 @@ six_region <- diff_pivot %>% filter(count >= 400000)
 seven_region <- diff_pivot %>% filter(count <= -400000)
 ```
 
-
 ```{r}
 # Created the regions in excel and upload them here
-region6 <- read_csv("https://raw.githubusercontent.com/meidelhoch/case_study_2/refs/heads/main/six_region.csv")
-region7 <- read_csv("https://raw.githubusercontent.com/meidelhoch/case_study_2/refs/heads/main/seven_region.csv")
+region6 <- read_csv(here("six_region.csv"))
+region7 <- read_csv(here("seven_region.csv"))
 
 # Transpose each of the matrices to orient them correctly
 region6 <-region6[, 2:29]
@@ -131,7 +129,6 @@ region6 <- t(region6)
 region7 <- region7[, 2:29]
 region7 <- t(region7)
 ```
-
 
 ```{r}
 # Plot each region to ensure it contains the correct points
@@ -147,7 +144,6 @@ plot_digit(diff[1,])
 plot_region(region7)
 plot_digit_lim(-diff[1,])
 ```
-
 
 ```{r}
 # Calculate proportion areas to see if our regions make sense
@@ -171,7 +167,6 @@ ggplot(areas_plot, aes(x=num,y=area,fill=digit)) + geom_boxplot() + labs(title =
 ggplot(areas_train, aes(x= area6, y = area7, color = digit)) + geom_point() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest for Sixes", y = "Region of Interest for Sevens")
 ```
 
-
 ```{r}
 # Use the calc_prop function to get our training and testing data into the format for our models
 areas_train <- train |>
@@ -190,7 +185,6 @@ areas_test <- test |>
   select(digit,area6, area7) |>
   mutate(digit = as.factor(digit))
 ```
-
 
 ```{r}
 # Create models
@@ -213,7 +207,6 @@ logit_model <- logistic_reg() |>
   set_mode("classification") |>
   set_engine("glm")
 ```
-
 
 ```{r}
 set.seed(271224)
@@ -280,7 +273,6 @@ mean(qda_result)
 mean(lda_result)
 mean(logit_result)
 ```
-
 
 ```{r}
 # Fit final model
