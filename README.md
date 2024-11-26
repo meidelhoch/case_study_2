@@ -5,4 +5,4 @@ This is a Quadratic Discriminant Analysis (QDA) model that uses handwriting data
 
 We created one "mask" of points (six_region.csv) that contains the points that are most common among 6's in our training data and another "mask" of points (seven_region.csv) that contains the points that are most common among 7's in our training data. Then, for a given digit, we calculate the percentage of points that are covered by each mask and use that to calculate predict whether the given digit is a 6 or a 7.
 
-We achieved 98% test accuracy which suggests we have a very good model.
+We achieved 98.9% test accuracy which suggests we have a very good model.
