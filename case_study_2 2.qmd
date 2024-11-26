@@ -1,0 +1,299 @@
+---
+title: "Case Study 2"
+subtitle: "Piper Dean and Marc Eidelhoch"
+format: pdf
+editor: visual
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(tidymodels)
+library(discrim)
+library(modelr)
+
+set.seed(271224)
+```
+
+```{r}
+# Get data of 6 and 7's
+six_seven_data <- read_csv("https://aloy.github.io/stat270/data/digits67.csv")
+```
+
+
+```{r}
+# All function definitions 
+
+# Variation on the given plot digit function to only plot values above 400,000
+plot_digit_lim <- function(row) {
+  digit_mat <- row |>
+    select(-digit)|>
+    as.numeric() |>
+    matrix(nrow = 28)
+  
+  image(digit_mat[,28:1], zlim = c(400000, 1000000000))
+}
+
+# Given plot digit function
+plot_digit <- function(row) {
+  digit_mat <- row |>
+    select(-digit)|>
+    as.numeric() |>
+    matrix(nrow = 28)
+  
+  image(digit_mat[,28:1])
+}
+
+# Given plot region function
+plot_region <- function(tbl) {
+  digit_mat <- as.matrix(tbl) * 128 # Convert tbl into matrix and assign gray=128
+
+  image(t(digit_mat)[,28:1]) #Plot the image making sure is rotated
+}
+
+# Given calculate proportion function
+calc_prop <- function (region, row) {
+  # Take row from mnist and transform into a "digit" matrix
+  digit_mat <-  row |>
+    as.numeric() |>
+    matrix(nrow = 28) |>
+    t()
+  
+  # Find positions of pixels from "region"
+  pos <- (region==1)
+  
+  # Subset "digit" to the positions and count dark pixels (grey>20)
+  dark <- digit_mat[pos] > 20 
+  
+  # Return proportion of dark pixels of "image" in "region"
+  return(sum(dark) / sum(pos))
+}
+```
+
+
+```{r}
+set.seed(271224)
+
+#Check the sample sizes of 6's and 7's
+six_seven_data %>% group_by(digit) %>% count()
+
+# Split into training and test datasets
+split <- six_seven_data %>% initial_split(prop = .75, strata = digit)
+train <- split %>% training()
+test <- split %>% testing()
+
+# Split the dataset into 6's and 7's 
+six_train <- train %>% filter(digit == 6)
+seven_train <- train %>% filter(digit == 7)
+```
+
+```{r}
+#EDA with training data
+par(mfrow = (c(1,2)))
+plot_digit(six_seven_data[1,])
+plot_digit(six_seven_data[145,])
+
+# Calculate the dark pixels for each pixel
+six_heatmap <- six_train %>% summarise(across(V1:V784, sum)) %>% mutate(digit = 6)
+seven_heatmap <- seven_train %>% summarise(across(V1:V784, sum)) %>% mutate(digit = 7)
+
+# Visualize the heatmap of each digit to see what pixels are most commonly dark for each number
+par(mfrow = (c(1,2)))
+plot_digit(six_heatmap[1,])
+plot_digit(seven_heatmap[1,])
+
+# Find the pixels with the largest difference between the two numbers
+diff <- six_heatmap - seven_heatmap
+
+# Visualize the regions where there is the biggest difference between the number of dark pixels for 6's and 7's
+
+plot_digit(diff[1,])
+par(mfrow = (c(1,2)))
+plot_digit_lim(diff[1,])
+plot_digit_lim(-diff[1,])
+
+# Select the pixels with the largest difference for each region
+diff_pivot <- pivot_longer(diff, cols = V1:V784, names_to = "region", values_to = "count")
+six_region <- diff_pivot %>% filter(count >= 400000)
+seven_region <- diff_pivot %>% filter(count <= -400000)
+```
+
+
+```{r}
+# Created the regions in excel and upload them here
+region6 <- read_csv("https://raw.githubusercontent.com/meidelhoch/case_study_2/refs/heads/main/six_region.csv")
+region7 <- read_csv("https://raw.githubusercontent.com/meidelhoch/case_study_2/refs/heads/main/seven_region.csv")
+
+# Transpose each of the matrices to orient them correctly
+region6 <-region6[, 2:29]
+region6 <- t(region6)
+
+region7 <- region7[, 2:29]
+region7 <- t(region7)
+```
+
+
+```{r}
+# Plot each region to ensure it contains the correct points
+# 6's
+par(mfrow = (c(1,3)))
+plot_digit(diff[1,])
+plot_region(region6)
+plot_digit_lim(diff[1,])
+
+# 7's
+par(mfrow = (c(1,3)))
+plot_digit(diff[1,])
+plot_region(region7)
+plot_digit_lim(-diff[1,])
+```
+
+
+```{r}
+# Calculate proportion areas to see if our regions make sense
+areas_plot <- train |>
+  rowwise()|>
+  mutate(area6 = calc_prop(region6, c_across(V1:V784)),
+         area7 = calc_prop(region7, c_across(V1:V784))) |>
+  ungroup()|>
+  select(digit,area6, area7) |>
+  pivot_longer(cols = c("area6", "area7"),
+    names_to = "num",
+    values_to = "area"
+  )
+
+areas_plot$digit <- as.factor(areas_plot$digit)
+
+
+# Visualize training data 
+ggplot(areas_plot, aes(x=num,y=area,fill=digit)) + geom_boxplot() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest", y = "Proportion within Region")
+
+ggplot(areas_train, aes(x= area6, y = area7, color = digit)) + geom_point() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest for Sixes", y = "Region of Interest for Sevens")
+```
+
+
+```{r}
+# Use the calc_prop function to get our training and testing data into the format for our models
+areas_train <- train |>
+  rowwise()|>
+  mutate(area6 = calc_prop(region6, c_across(V1:V784)),
+         area7 = calc_prop(region7, c_across(V1:V784))) |>
+  ungroup()|>
+  select(digit,area6, area7) |>
+  mutate(digit = as.factor(digit))
+
+areas_test <- test |>
+  rowwise()|>
+  mutate(area6 = calc_prop(region6, c_across(V1:V784)),
+         area7 = calc_prop(region7, c_across(V1:V784))) |>
+  ungroup()|>
+  select(digit,area6, area7) |>
+  mutate(digit = as.factor(digit))
+```
+
+
+```{r}
+# Create models
+
+# QDA Model
+qda_model <- discrim_quad() |> 
+  set_engine("MASS") |>
+  set_mode("classification")
+
+# LDA Model
+
+lda_model <- discrim_linear() |> 
+  set_engine("MASS") |>
+  set_mode("classification")
+
+
+# Logistic Regression Model
+
+logit_model <- logistic_reg() |>
+  set_mode("classification") |>
+  set_engine("glm")
+```
+
+
+```{r}
+set.seed(271224)
+# K-Fold cross validation
+folds <- vfold_cv(areas_train, v = 10)
+
+# Empty vectors to store results
+qda_result = rep(NA, 10)
+lda_result = rep(NA, 10)
+logit_result = rep(NA, 10)
+for (i in 1:10) {
+  # Code from stackoverflow (https://stackoverflow.com/questions/75548116/resamples-folds-for-cross-validation-in-r)
+  # Get training and test splits for each fold
+  split <- get_rsplit(folds, index = i)
+  test <- assessment(split)
+  train <- analysis(split)
+  
+  #QDA
+  qda_recipe <- recipe(digit ~ ., data = train)
+
+  qda_wf <- workflow() %>% 
+    add_model(qda_model) %>% 
+    add_recipe(qda_recipe) 
+  
+  qda_fit <- qda_wf %>% fit(train)
+  qda_results <- qda_fit %>% augment(new_data = test)
+  
+  # LDA
+  lda_recipe <- recipe(digit ~ ., data = areas_train)
+
+  lda_wf <- workflow() %>% 
+    add_model(lda_model) %>% 
+    add_recipe(lda_recipe) 
+  
+  lda_fit <- lda_wf %>% fit(train)
+  lda_results <- lda_fit %>% augment(new_data = test)
+
+  # Logistic
+  logit_recipe <- recipe(digit ~ ., data = areas_train)
+  
+  logit_wf <- workflow() |>
+    add_recipe(logit_recipe) |>
+    add_model(logit_model)
+  
+  logit_fit <- logit_wf %>% fit(train)
+  logit_results <- logit_fit %>% augment(new_data = test)
+  
+  # Get results
+  qda_conf <- qda_results %>% conf_mat(truth = digit, estimate = .pred_class)
+  accuracy_row_qda <- summary(qda_conf) %>% filter(.metric == "accuracy")
+  qda_result[i] <- accuracy_row_qda$.estimate
+  
+  lda_conf <- lda_results %>% conf_mat(truth = digit, estimate = .pred_class)
+  accuracy_row_lda <- summary(lda_conf) %>% filter(.metric == "accuracy")
+  lda_result[i] <- accuracy_row_lda$.estimate
+  
+  logit_conf <- logit_results %>% conf_mat(truth = digit, estimate = .pred_class)
+  accuracy_row_logit <- summary(logit_conf) %>% filter(.metric == "accuracy")
+  logit_result[i] <- accuracy_row_logit$.estimate
+}
+
+
+mean(qda_result)
+mean(lda_result)
+mean(logit_result)
+```
+
+
+```{r}
+# Fit final model
+qda_recipe_final <- recipe(digit ~ ., data = areas_train)
+
+qda_wf_final <- workflow() %>% 
+  add_model(qda_model) %>% 
+  add_recipe(qda_recipe_final) 
+
+qda_fit_final <- qda_wf_final %>% fit(areas_train)
+qda_results_final <- qda_fit_final %>% augment(new_data = areas_test)
+
+# Get model metrics for final model
+qda_conf_final <- qda_results_final %>% conf_mat(truth = digit, estimate = .pred_class)
+summary(qda_conf_final) 
+```
