@@ -1,5 +1,5 @@
 ---
-title: "Case Study 2"
+title: "Classifying 6's and 7's from MINST Handwriting Dataset"
 subtitle: "Piper Dean and Marc Eidelhoch"
 format: pdf
 editor: visual
@@ -159,12 +159,6 @@ areas_plot <- train |>
   )
 
 areas_plot$digit <- as.factor(areas_plot$digit)
-
-
-# Visualize training data 
-ggplot(areas_plot, aes(x=num,y=area,fill=digit)) + geom_boxplot() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest", y = "Proportion within Region")
-
-ggplot(areas_train, aes(x= area6, y = area7, color = digit)) + geom_point() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest for Sixes", y = "Region of Interest for Sevens")
 ```
 
 ```{r}
@@ -185,6 +179,14 @@ areas_test <- test |>
   select(digit,area6, area7) |>
   mutate(digit = as.factor(digit))
 ```
+
+```{r}
+# Visualize training data 
+ggplot(areas_plot, aes(x=num,y=area,fill=digit)) + geom_boxplot() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest", y = "Proportion within Region")
+
+ggplot(areas_train, aes(x= area6, y = area7, color = digit)) + geom_point() + labs(title = "Proportion of dark pixel within each region of interest grouped by digit", x = "Region of Interest for Sixes", y = "Region of Interest for Sevens")
+```
+
 
 ```{r}
 # Create models
